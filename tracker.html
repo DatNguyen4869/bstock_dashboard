@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>bStocks Tracker Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .header h1 {
+      font-size: 18px;
+      color: #f0b90b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header .wallet-info {
+      font-size: 13px;
+      color: #8b949e;
+      font-family: monospace;
+    }
+    .header .stats {
+      font-size: 13px;
+      color: #8b949e;
+    }
+
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .input-group {
+      flex: 1;
+      min-width: 180px;
+    }
+    .input-group label {
+      display: block;
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 9px 12px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: 13px;
+      font-family: monospace;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-group input:focus {
+      border-color: #f0b90b;
+    }
+
+    .refresh-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #21262d;
+      font-size: 13px;
+    }
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      color: #e6edf3;
+      font-weight: 500;
+      user-select: none;
+    }
+    .interval-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #8b949e;
+    }
+    .interval-box input[type="number"] {
+      width: 68px;
+      padding: 5px 8px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      font-size: 13px;
+      font-family: monospace;
+      text-align: center;
+      outline: none;
+    }
+    .interval-box input[type="number"]:focus {
+      border-color: #f0b90b;
+    }
+
+    .preset-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .preset-btn {
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #8b949e;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .preset-btn:hover { color: #e6edf3; border-color: #8b949e; }
+    .preset-btn.active {
+      background: #f0b90b22;
+      color: #f0b90b;
+      border-color: #f0b90b;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #21262d;
+      color: #8b949e;
+      border: 1px solid #30363d;
+      margin-left: auto;
+    }
+    .badge.live { background: #23863622; color: #3fb950; border-color: #238636; }
+    .badge.fetching { background: #f0b90b22; color: #f0b90b; border-color: #f0b90b; }
+
+    .btn {
+      padding: 9px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.15s;
+    }
+    .btn:hover:not(:disabled) { opacity: 0.86; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-yellow { background: #f0b90b; color: #0d1117; }
+
+    .status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #8b949e;
+      min-height: 18px;
+    }
+    .status.error { color: #f85149; }
+    .status.success { color: #3fb950; }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .card-label { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+    .card-value { font-size: 22px; font-weight: bold; }
+    .card-value.red { color: #f85149; }
+    .card-value.green { color: #3fb950; }
+    .card-value.yellow { color: #f0b90b; }
+    .card-value.blue { color: #58a6ff; }
+    .card-sub { font-size: 11px; color: #8b949e; margin-top: 4px; }
+
+    .token-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .token-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .token-card .token-name {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .token-card .mult-badge {
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: #f0b90b22;
+      color: #f0b90b;
+      font-weight: 600;
+    }
+    .token-card .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 2px 0;
+      color: #8b949e;
+    }
+    .token-card .stat-row .val { color: #e6edf3; font-weight: 500; }
+
+    .table-wrapper {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .table-header-row, .table-row {
+      display: grid;
+      grid-template-columns: 80px 115px 85px 180px 140px 95px 100px;
+      padding: 10px 16px;
+      align-items: center;
+    }
+    .table-header-row {
+      background: #1c2128;
+      border-bottom: 1px solid #30363d;
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .table-row {
+      border-bottom: 1px solid #21262d;
+      font-size: 13px;
+      transition: background 0.15s;
+    }
+    .table-row:hover { background: #1c2128; }
+    .table-row:last-child { border-bottom: none; }
+    .table-row .round-num { color: #58a6ff; font-weight: 600; }
+    .table-row .round-info { font-size: 11px; color: #8b949e; }
+    .table-row .token { font-weight: bold; color: #e6edf3; }
+    .table-row .token.boosted::after { content: '⭐'; margin-left: 4px; font-size: 11px; }
+    .table-row .buy-sell { font-size: 12px; }
+    .table-row .buy-sell .buy { color: #e6edf3; }
+    .table-row .buy-sell .arrow { color: #8b949e; margin: 0 2px; }
+    .table-row .buy-sell .sell { color: #8b949e; }
+    .table-row .fee { font-size: 12px; font-weight: 600; }
+    .table-row .fee-pct { font-size: 10px; color: #8b949e; }
+    .table-row .gas { color: #8b949e; font-size: 12px; }
+    .table-row .points { color: #f0b90b; font-weight: 600; }
+
+    .table-body { max-height: 520px; overflow-y: auto; }
+    .table-body::-webkit-scrollbar { width: 6px; }
+    .table-body::-webkit-scrollbar-track { background: #161b22; }
+    .table-body::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #30363d;
+      border-top-color: #f0b90b;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none !important; }
+
+    @media (max-width: 820px) {
+      .table-header-row, .table-row {
+        grid-template-columns: 60px 90px 65px 140px 110px 75px 75px;
+        font-size: 11px;
+        padding: 8px 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="panel">
+    <div class="input-row">
+      <div class="input-group" style="flex: 2;">
+        <label>Địa chỉ ví (BSC)</label>
+        <input type="text" id="walletInput" placeholder="0x..." value="0xe11795Ee797EcF5603697F1AdF4B92dcC63fA70D">
+      </div>
+      <button class="btn btn-yellow" id="fetchBtn" onclick="startFetch(false)">🔄 Làm mới ngay</button>
+    </div>
+
+    <div class="refresh-bar">
+      <label class="toggle-label">
+        <input type="checkbox" id="autoRefreshToggle" checked onchange="onRefreshConfigChanged()">
+        Tự động refresh
+      </label>
+
+      <div class="interval-box">
+        <span>Mỗi</span>
+        <input type="number" id="refreshSecInput" min="3" max="300" step="1" value="10" onchange="onIntervalInputChanged()">
+        <span>giây</span>
+      </div>
+
+      <div class="preset-group" aria-label="Chọn nhanh chu kỳ">
+        <button type="button" class="preset-btn" data-sec="5" onclick="setIntervalPreset(5)">5s</button>
+        <button type="button" class="preset-btn active" data-sec="10" onclick="setIntervalPreset(10)">10s</button>
+        <button type="button" class="preset-btn" data-sec="15" onclick="setIntervalPreset(15)">15s</button>
+      </div>
+
+      <span class="badge live" id="countdownBadge">⏱️ Chờ khởi tạo...</span>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="header" id="headerInfo">
+      <h1>📒 Nhật ký giao dịch bStocks</h1>
+      <span class="wallet-info" id="walletDisplay"></span>
+      <span class="stats" id="headerStats"></span>
+    </div>
+
+    <div class="summary-cards">
+      <div class="card">
+        <div class="card-label">Phí đã mất (đã chốt)</div>
+        <div class="card-value red" id="totalFeeLocked">$0.00</div>
+        <div class="card-sub" id="feeBreakdown">spread $0 + gas $0</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Tạm tính nếu bán ngay</div>
+        <div class="card-value green" id="unrealizedPnl">+$0.00</div>
+        <div class="card-sub" id="holdingInfo">đang giữ $0 bStock</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Tổng chi phí</div>
+        <div class="card-value red" id="totalCost">$0.00</div>
+        <div class="card-sub" id="costPerPoint">$0 cho mỗi 1,000 điểm</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Số vòng · số lệnh</div>
+        <div class="card-value blue" id="roundOrders">0 · 0</div>
+        <div class="card-sub" id="volumeInfo">$0 volume</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Lãi dự kiến lúc này</div>
+        <div class="card-value red" id="expectedProfit">$0.00</div>
+        <div class="card-sub" id="profitBreakdown">Chưa tính thưởng leaderboard</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Vị trí Leaderboard</div>
+        <div class="card-value yellow" id="leaderboardRank">--</div>
+        <div class="card-sub" id="leaderboardSub">Đang tra bảng xếp hạng...</div>
+        <div class="card-sub" id="leaderboardUpdated" style="color:#f0b90b; margin-top:4px;"></div>
+      </div>
+    </div>
+
+    <div class="token-stats" id="tokenStats"></div>
+
+    <div class="table-wrapper">
+      <div class="table-header-row">
+        <div>Vòng</div>
+        <div>Thời gian</div>
+        <div>Mã</div>
+        <div>Mua → bán</div>
+        <div>Phí đã mất</div>
+        <div>Gas</div>
+        <div>Điểm</div>
+      </div>
+      <div class="table-body" id="tableBody"></div>
+    </div>
+  </div>
+
+<script>
+const BOOSTED = new Set(['ANTB', 'NVDAB']);
+const LS_WALLET = 'bstock_tracker_wallet';
+const LS_AUTO = 'bstock_tracker_auto';
+const LS_INTERVAL = 'bstock_tracker_interval_sec';
+
+let isFetching = false;
+let remainingSec = 10;
+let tickTimer = null;
+
+function getConfiguredInterval() {
+  const raw = parseInt(document.getElementById('refreshSecInput').value || '10', 10);
+  if (Number.isNaN(raw)) return 10;
+  return Math.max(3, Math.min(300, raw));
+}
+
+function syncPresetButtons(sec) {
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    const val = parseInt(btn.getAttribute('data-sec'), 10);
+    btn.classList.toggle('active', val === sec);
+  });
+}
+
+function savePreferences() {
+  localStorage.setItem(LS_WALLET, document.getElementById('walletInput').value.trim());
+  localStorage.setItem(LS_AUTO, document.getElementById('autoRefreshToggle').checked ? '1' : '0');
+  localStorage.setItem(LS_INTERVAL, String(getConfiguredInterval()));
+}
+
+function setIntervalPreset(sec) {
+  document.getElementById('refreshSecInput').value = sec;
+  document.getElementById('autoRefreshToggle').checked = true;
+  syncPresetButtons(sec);
+  savePreferences();
+  resetCountdown();
+}
+
+function onIntervalInputChanged() {
+  const sec = getConfiguredInterval();
+  document.getElementById('refreshSecInput').value = sec;
+  syncPresetButtons(sec);
+  savePreferences();
+  resetCountdown();
+}
+
+function onRefreshConfigChanged() {
+  savePreferences();
+  resetCountdown();
+}
+
+function updateCountdownBadge() {
+  const badge = document.getElementById('countdownBadge');
+  const autoOn = document.getElementById('autoRefreshToggle').checked;
+  if (isFetching) {
+    badge.className = 'badge fetching';
+    badge.textContent = '⏳ Đang cập nhật...';
+    return;
+  }
+  if (!autoOn) {
+    badge.className = 'badge';
+    badge.textContent = '⏸️ Đã tắt tự động';
+    return;
+  }
+  badge.className = 'badge live';
+  badge.textContent = `⏱️ Làm mới sau ${remainingSec}s`;
+}
+
+function resetCountdown() {
+  if (tickTimer) {
+    clearInterval(tickTimer);
+    tickTimer = null;
+  }
+  remainingSec = getConfiguredInterval();
+  updateCountdownBadge();
+
+  if (!document.getElementById('autoRefreshToggle').checked) {
+    return;
+  }
+
+  tickTimer = setInterval(() => {
+    if (isFetching) return;
+    if (!document.getElementById('autoRefreshToggle').checked) {
+      updateCountdownBadge();
+      return;
+    }
+    remainingSec -= 1;
+    if (remainingSec <= 0) {
+      startFetch(true);
+    } else {
+      updateCountdownBadge();
+    }
+  }, 1000);
+}
+
+function setStatus(msg, type = '') {
+  const el = document.getElementById('status');
+  el.className = 'status ' + type;
+  el.innerHTML = msg;
+}
+
+function nowClock() {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+async function startFetch(silent = false) {
+  if (isFetching) return;
+  const wallet = document.getElementById('walletInput').value.trim();
+  if (!wallet || !wallet.startsWith('0x')) {
+    if (!silent) setStatus('⚠️ Vui lòng nhập địa chỉ ví hợp lệ (bắt đầu bằng 0x)', 'error');
+    return;
+  }
+  savePreferences();
+
+  isFetching = true;
+  updateCountdownBadge();
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  if (!silent) {
+    btn.textContent = '⏳ Đang tải...';
+    setStatus('<span class="spinner"></span> Đang phân tích giao dịch qua BSC RPC... (lần đầu ~10-15s, lần sau chỉ vài giây)');
+  }
+
+  try {
+    const resp = await fetch(`/fetch-data?wallet=${encodeURIComponent(wallet)}`);
+    const data = await resp.json();
+    if (data.error) {
+      setStatus(`❌ Lỗi: ${data.error}`, 'error');
+      return;
+    }
+    renderResults(wallet, data);
+    const secStr = data.elapsedSeconds != null ? ` (${data.elapsedSeconds}s)` : '';
+    const lbUpdStr = data.leaderboard && data.leaderboard.lastUpdatedAt
+      ? ` · Trust BXH chốt ${formatLbTime(data.leaderboard.lastUpdatedAt)}`
+      : '';
+    setStatus(
+      `✅ Cập nhật lúc ${nowClock()}${secStr}${lbUpdStr} · ${data.totalRounds} vòng, ${data.totalOrders} lệnh, $${Math.round(data.totalVolume).toLocaleString()} volume`,
+      'success'
+    );
+  } catch (e) {
+    setStatus(`❌ Lỗi kết nối: ${e.message}. Server đang chạy chưa?`, 'error');
+  } finally {
+    isFetching = false;
+    btn.disabled = false;
+    btn.textContent = '🔄 Làm mới ngay';
+    resetCountdown();
+  }
+}
+
+function formatTime(ts) {
+  const d = new Date(ts * 1000);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  return `${hh}:${mm} ${dd}-${mo}`;
+}
+
+function formatHoldTime(seconds) {
+  if (seconds < 60) return `giữ ${seconds} giây`;
+  if (seconds < 3600) return `giữ ${Math.round(seconds / 60)} phút`;
+  return `giữ ${(seconds / 3600).toFixed(1)} giờ`;
+}
+
+function formatUsd(n) {
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 1000) return sign + '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (abs >= 1) return sign + '$' + abs.toFixed(2);
+  if (abs >= 0.01) return sign + '$' + abs.toFixed(3);
+  return sign + '$' + abs.toFixed(4);
+}
+
+function formatLbTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const diffMin = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+  const ago = diffMin < 1 ? 'vừa xong'
+    : diffMin < 60 ? `${diffMin} phút trước`
+    : `${Math.floor(diffMin / 60)}h${diffMin % 60}p trước`;
+  return `${hh}:${mm}:${ss} ${dd}-${mo} (${ago})`;
+}
+
+function renderResults(wallet, data) {
+  document.getElementById('results').classList.remove('hidden');
+
+  const lb = data.leaderboard || null;
+  const rankTag = lb && (lb.officialRank || lb.estimatedRank)
+    ? `Top #${lb.officialRank || lb.estimatedRank}${lb.totalEntries ? '/' + lb.totalEntries : ''} · `
+    : '';
+  document.getElementById('walletDisplay').textContent = wallet;
+  document.getElementById('headerStats').textContent =
+    `${rankTag}${data.totalPoints.toLocaleString('en-US', {maximumFractionDigits: 0})} điểm · $${data.totalVolume.toLocaleString('en-US', {maximumFractionDigits: 0})} vol`;
+
+  const lbRankEl = document.getElementById('leaderboardRank');
+  const lbSubEl = document.getElementById('leaderboardSub');
+  const lbUpdEl = document.getElementById('leaderboardUpdated');
+  if (lb) {
+    const off = lb.officialRank;
+    const est = lb.estimatedRank;
+    const tot = lb.totalEntries || 0;
+    if (off != null) {
+      lbRankEl.textContent = `#${off} / ${tot}`;
+      lbRankEl.className = 'card-value ' + (off <= 20 ? 'green' : 'yellow');
+    } else if (est != null) {
+      lbRankEl.textContent = `~#${est}`;
+      lbRankEl.className = 'card-value yellow';
+    } else {
+      lbRankEl.textContent = 'Ngoài BXH';
+      lbRankEl.className = 'card-value';
+    }
+    const parts = [];
+    if (est != null && off != null && est !== off) {
+      parts.push(`Ước tính hiện tại: ~#${est}`);
+    } else if (off == null && est != null) {
+      parts.push(`Ước tính theo điểm on-chain (${tot} ví)`);
+    }
+    if (lb.nextRank != null && lb.gapToNext != null) {
+      parts.push(`cách #${lb.nextRank}: +${Math.round(lb.gapToNext).toLocaleString('en-US')} đ`);
+    }
+    if (lb.milestoneRank != null && lb.gapToMilestone != null) {
+      parts.push(`Top ${lb.milestoneRank}: +${Math.round(lb.gapToMilestone).toLocaleString('en-US')} đ`);
+    }
+    lbSubEl.textContent = parts.length > 0 ? parts.join(' · ') : 'Đang đứng đầu BXH';
+    const upd = formatLbTime(lb.lastUpdatedAt);
+    lbUpdEl.textContent = upd ? `Trust cập nhật: ${upd}` : '';
+  } else {
+    lbRankEl.textContent = '--';
+    lbRankEl.className = 'card-value';
+    lbSubEl.textContent = 'Không tải được BXH Trust';
+    lbUpdEl.textContent = '';
+  }
+
+  document.getElementById('totalFeeLocked').textContent = formatUsd(data.totalSpread + data.totalGas);
+  document.getElementById('feeBreakdown').textContent = `spread ${formatUsd(data.totalSpread)} + gas ${formatUsd(data.totalGas)}`;
+
+  const holdVal = data.holdingValue;
+  document.getElementById('unrealizedPnl').textContent = '+$0.00';
+  document.getElementById('holdingInfo').textContent = `đang giữ ${formatUsd(holdVal)} bStock`;
+
+  const totalCost = data.totalSpread + data.totalGas;
+  document.getElementById('totalCost').textContent = formatUsd(totalCost);
+  document.getElementById('costPerPoint').textContent = `${formatUsd(data.costPer1000)} cho mỗi 1,000 điểm`;
+
+  document.getElementById('roundOrders').textContent = `${data.totalRounds} · ${data.totalOrders}`;
+  document.getElementById('volumeInfo').textContent = `$${data.totalVolume.toLocaleString('en-US', {maximumFractionDigits: 0})} volume`;
+
+  document.getElementById('expectedProfit').textContent = totalCost > 0 ? `-${formatUsd(totalCost)}` : `+${formatUsd(Math.abs(totalCost))}`;
+  document.getElementById('expectedProfit').className = totalCost > 0 ? 'card-value red' : 'card-value green';
+  document.getElementById('profitBreakdown').textContent = 'Chưa tính thưởng leaderboard';
+
+  const tokenStatsEl = document.getElementById('tokenStats');
+  tokenStatsEl.innerHTML = '';
+  for (const [token, stats] of Object.entries(data.tokenBreakdown)) {
+    const isBoosted = BOOSTED.has(token);
+    tokenStatsEl.innerHTML += `
+      <div class="token-card">
+        <div class="token-name">
+          ${token}
+          ${isBoosted ? '<span class="mult-badge">1.5x ⭐</span>' : '<span class="mult-badge" style="background:#30363d;color:#8b949e">1.0x</span>'}
+        </div>
+        <div class="stat-row"><span>Số vòng</span><span class="val">${stats.rounds}</span></div>
+        <div class="stat-row"><span>Số lệnh</span><span class="val">${stats.orders}</span></div>
+        <div class="stat-row"><span>Volume</span><span class="val">${formatUsd(stats.volume)}</span></div>
+        <div class="stat-row"><span>Điểm</span><span class="val" style="color:#f0b90b">${stats.points.toLocaleString('en-US', {maximumFractionDigits: 0})}</span></div>
+        <div class="stat-row"><span>Spread</span><span class="val" style="color:#f85149">${formatUsd(stats.spread)}</span></div>
+        <div class="stat-row"><span>Gas</span><span class="val">${formatUsd(stats.gas)}</span></div>
+        <div class="stat-row"><span>Tổng phí</span><span class="val" style="color:#f85149">${formatUsd(stats.spread + stats.gas)}</span></div>
+      </div>
+    `;
+  }
+
+  const tableBody = document.getElementById('tableBody');
+  tableBody.innerHTML = '';
+
+  if (data.rounds.length === 0) {
+    tableBody.innerHTML = '<div style="padding: 40px; text-align: center; color: #8b949e;">Không tìm thấy giao dịch bStock nào trong thời gian campaign.<br>Kiểm tra lại địa chỉ ví BSC.</div>';
+    return;
+  }
+
+  const sortedRounds = [...data.rounds].reverse();
+  let rowsHtml = '';
+  for (let i = 0; i < sortedRounds.length; i++) {
+    const round = sortedRounds[i];
+    const roundNum = data.rounds.length - i;
+    const isBoosted = BOOSTED.has(round.token.toUpperCase());
+    const spreadPct = round.buy.usdAmount > 0 ? ((round.spread / round.buy.usdAmount) * 100).toFixed(3) : '0';
+    const feeColor = round.totalFee < 0 ? '#3fb950' : '#f85149';
+
+    rowsHtml += `
+      <div class="table-row">
+        <div>
+          <span class="round-num">#${roundNum}</span>
+          <div class="round-info">2 lệnh</div>
+        </div>
+        <div>
+          <div>${formatTime(round.buy.timestamp)}</div>
+          <div class="round-info">${formatHoldTime(round.holdTime)}</div>
+        </div>
+        <div>
+          <span class="token ${isBoosted ? 'boosted' : ''}">${round.token}</span>
+        </div>
+        <div class="buy-sell">
+          <span class="buy">${formatUsd(round.buy.usdAmount)}</span>
+          <span class="arrow">→</span>
+          <span class="sell">${formatUsd(round.sell.usdAmount)}</span>
+        </div>
+        <div>
+          <div class="fee" style="color:${feeColor}">${formatUsd(round.totalFee)}</div>
+          <div class="fee-pct">${spreadPct}% spread + gas</div>
+        </div>
+        <div class="gas">${formatUsd(round.totalGas)}</div>
+        <div class="points">${round.points.toLocaleString('en-US', {maximumFractionDigits: 0})}</div>
+      </div>
+    `;
+  }
+  tableBody.innerHTML = rowsHtml;
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const savedWallet = localStorage.getItem(LS_WALLET);
+  if (savedWallet) {
+    document.getElementById('walletInput').value = savedWallet;
+  } else {
+    try {
+      const resp = await fetch('/tracker/default');
+      const def = await resp.json();
+      if (def.wallet_address) document.getElementById('walletInput').value = def.wallet_address;
+    } catch (_) {}
+  }
+
+  const savedAuto = localStorage.getItem(LS_AUTO);
+  if (savedAuto !== null) {
+    document.getElementById('autoRefreshToggle').checked = savedAuto === '1';
+  }
+
+  const savedSec = parseInt(localStorage.getItem(LS_INTERVAL) || '10', 10);
+  const validSec = Number.isNaN(savedSec) ? 10 : Math.max(3, Math.min(300, savedSec));
+  document.getElementById('refreshSecInput').value = validSec;
+  syncPresetButtons(validSec);
+
+  await startFetch(false);
+});
+</script>
+
+</body>
+</html>
