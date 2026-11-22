@@ -642,21 +642,11 @@ function renderResults(wallet, data) {
     if (lb.neighborAvgPtsPerHour != null) {
       hParts.push(`Nhóm ±5 ví: +${Math.round(lb.neighborAvgPtsPerHour).toLocaleString('en-US')} đ/h`);
     }
-    if (lb.neighborAvgOrdersPerHour != null) {
-      hParts.push(`~${lb.neighborAvgOrdersPerHour} lệnh/h`);
-    }
     if (lb.neighborAvgVolPerHour != null) {
       hParts.push(`$${Math.round(lb.neighborAvgVolPerHour).toLocaleString('en-US')}/h`);
     }
-    const srcLabel = lb.habitSource === 'onchain' ? 'on-chain 12h'
-      : lb.habitSource === 'snapshot' ? 'lịch sử BXH'
-      : 'bình quân campaign';
-    if (hParts.length > 0) {
-      const scanNote = lb.habitScanning && lb.habitSource !== 'onchain' ? ' · đang quét nền on-chain...' : '';
-      lbHabitEl.textContent = `${hParts.join(' · ')} (${srcLabel}${scanNote})`;
-    } else {
-      lbHabitEl.textContent = '';
-    }
+    const srcLabel = lb.habitSource === 'snapshot' ? 'lịch sử BXH' : 'bình quân campaign';
+    lbHabitEl.textContent = hParts.length > 0 ? `${hParts.join(' · ')} (${srcLabel})` : '';
 
     const upd = formatLbTime(lb.lastUpdatedAt);
     lbUpdEl.textContent = upd ? `Trust cập nhật: ${upd}` : '';

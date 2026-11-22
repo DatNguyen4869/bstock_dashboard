@@ -6,31 +6,25 @@ import json
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
 
-from tracker_service import CAMPAIGN_START_UTC, fetch_wallet_data
+from tracker_service import CAMPAIGN_START_UTC
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 LB_HISTORY_FILE = DATA_DIR / "lb_history.json"
-NEIGHBOR_HABITS_FILE = DATA_DIR / "neighbor_habits.json"
 
 LEADERBOARD_URL = "https://api.trustwallet.com/v1/campaigns/bstocks/leaderboard"
 LEADERBOARD_TTL_SEC = 30.0
-NEIGHBOR_TTL_SEC = 600.0  # 10 minutes cache for ±5 neighbor on-chain scans
-HABIT_WINDOW_HOURS = 12.0
 NEIGHBOR_RADIUS = 5
 
 _lb_lock = threading.Lock()
 _lb_cache: Dict[str, Any] = {"ts": 0.0, "data": None}
-
 _history_lock = threading.Lock()
-_habit_lock = threading.Lock()
-_habit_scan_running = False
 
 
 def _parse_iso_ts(iso: Optional[str]) -> Optional[float]:
@@ -82,19 +76,24 @@ def _record_lb_snapshot(payload: dict) -> None:
         if any(s.get("last_updated_at") == upd for s in snaps):
             return
         pts_map = {}
+        vol_map = {}
         for e in entries:
             addr = str(e.get("address") or "").lower()
             if addr:
                 pts_map[addr] = float(e.get("points") or 0.0)
-        snaps.append({"last_updated_at": upd, "ts": ts, "points": pts_map})
+                vol_map[addr] = float(e.get("volume") or 0.0)
+        snaps.append({"last_updated_at": upd, "ts": ts, "points": pts_map, "volume": vol_map})
         snaps.sort(key=lambda s: float(s.get("ts") or 0.0))
         if len(snaps) > 48:
             snaps = snaps[-48:]
         _save_json(LB_HISTORY_FILE, {"snapshots": snaps})
 
 
-def _compute_snapshot_velocities(entries: List[Dict[str, Any]], lb_ts: Optional[float]) -> tuple[Dict[str, float], str]:
-    """Compute points/hour for each wallet from Trust snapshots or campaign average."""
+def _compute_snapshot_velocities(
+    entries: List[Dict[str, Any]],
+    lb_ts: Optional[float],
+) -> tuple[Dict[str, float], Dict[str, float], str]:
+    """Compute points/hour and volume/hour for each wallet from Trust snapshots or campaign average (0 RPC calls)."""
     with _history_lock:
         hist = _load_json(LB_HISTORY_FILE, {"snapshots": []})
     snaps = hist.get("snapshots") or []
@@ -105,73 +104,24 @@ def _compute_snapshot_velocities(entries: List[Dict[str, Any]], lb_ts: Optional[
         if dt_hours >= 0.05:
             prev_pts = prev.get("points") or {}
             curr_pts = curr.get("points") or {}
-            vel: Dict[str, float] = {}
+            prev_vol = prev.get("volume") or {}
+            curr_vol = curr.get("volume") or {}
+            pts_vel: Dict[str, float] = {}
+            vol_vel: Dict[str, float] = {}
             for r in entries:
                 addr = r["address"]
                 if addr in prev_pts and addr in curr_pts:
-                    vel[addr] = max(0.0, (float(curr_pts[addr]) - float(prev_pts[addr])) / dt_hours)
-            if vel:
-                return vel, "snapshot"
+                    pts_vel[addr] = max(0.0, (float(curr_pts[addr]) - float(prev_pts[addr])) / dt_hours)
+                if addr in prev_vol and addr in curr_vol:
+                    vol_vel[addr] = max(0.0, (float(curr_vol[addr]) - float(prev_vol[addr])) / dt_hours)
+            if pts_vel:
+                return pts_vel, vol_vel, "snapshot"
 
     ref_ts = lb_ts or time.time()
     campaign_hours = max(1.0, (ref_ts - CAMPAIGN_START_UTC.timestamp()) / 3600.0)
-    return {r["address"]: max(0.0, r["points"] / campaign_hours) for r in entries}, "campaign"
-
-
-def _scan_neighbors_worker(addresses: List[str]) -> None:
-    """Background worker to measure recent on-chain trading habit of ±5 neighbor wallets."""
-    global _habit_scan_running
-    try:
-        now = time.time()
-        window_start = max(CAMPAIGN_START_UTC.timestamp(), now - HABIT_WINDOW_HOURS * 3600.0)
-        window_hours = max(1.0, (now - window_start) / 3600.0)
-
-        for addr in addresses:
-            try:
-                data = fetch_wallet_data(addr)
-                orders = data.get("orders") or []
-                recent = [o for o in orders if float(o.get("timestamp") or 0) >= window_start]
-                pts_recent = sum(float(o.get("usdAmount") or 0) * float(o.get("multiplier") or 1.0) for o in recent)
-                vol_recent = sum(float(o.get("usdAmount") or 0) for o in recent)
-                entry = {
-                    "scanned_at": time.time(),
-                    "pts_per_hour": round(pts_recent / window_hours, 2),
-                    "orders_per_hour": round(len(recent) / window_hours, 2),
-                    "vol_per_hour": round(vol_recent / window_hours, 2),
-                    "window_hours": round(window_hours, 2),
-                    "recent_orders": len(recent),
-                }
-                with _habit_lock:
-                    habits = _load_json(NEIGHBOR_HABITS_FILE, {})
-                    if not isinstance(habits, dict):
-                        habits = {}
-                    habits[addr] = entry
-                    _save_json(NEIGHBOR_HABITS_FILE, habits)
-            except Exception:
-                pass
-            time.sleep(0.8)
-    finally:
-        with _habit_lock:
-            _habit_scan_running = False
-
-
-def _maybe_trigger_neighbor_scan(neighbor_addrs: List[str]) -> tuple[Dict[str, dict], bool]:
-    """Return cached neighbor habits and start a background scan if any are missing/stale."""
-    global _habit_scan_running
-    now = time.time()
-    with _habit_lock:
-        habits = _load_json(NEIGHBOR_HABITS_FILE, {})
-        if not isinstance(habits, dict):
-            habits = {}
-        stale = [
-            a for a in neighbor_addrs
-            if a not in habits or (now - float(habits[a].get("scanned_at") or 0.0)) > NEIGHBOR_TTL_SEC
-        ]
-        if stale and not _habit_scan_running:
-            _habit_scan_running = True
-            t = threading.Thread(target=_scan_neighbors_worker, args=(stale,), daemon=True)
-            t.start()
-        return habits, _habit_scan_running
+    pts_vel = {r["address"]: max(0.0, r["points"] / campaign_hours) for r in entries}
+    vol_vel = {r["address"]: max(0.0, r["volume"] / campaign_hours) for r in entries}
+    return pts_vel, vol_vel, "campaign"
 
 
 def fetch_leaderboard_raw(force: bool = False) -> Optional[dict]:
@@ -204,7 +154,7 @@ def compute_leaderboard_status(
     wallet: str,
     realtime_points: Optional[float] = None,
 ) -> Optional[dict]:
-    """Compute official rank, raw realtime rank, and habit-projected rank (±5 neighbors)."""
+    """Compute official rank, raw realtime rank, and habit-projected rank (±5 neighbors, zero extra RPC)."""
     if not lb_payload or not isinstance(lb_payload.get("entries"), list):
         return None
     w_low = (wallet or "").strip().lower()
@@ -235,11 +185,9 @@ def compute_leaderboard_status(
     projected_next_rank: Optional[int] = None
     projected_gap_to_next: Optional[float] = None
     neighbor_avg_pts_h: Optional[float] = None
-    neighbor_avg_orders_h: Optional[float] = None
     neighbor_avg_vol_h: Optional[float] = None
     neighbor_count = 0
     habit_source = "campaign"
-    habit_scanning = False
 
     if rt_pts is not None:
         higher = [r for r in others if r["points"] > rt_pts]
@@ -255,40 +203,28 @@ def compute_leaderboard_status(
                 gap_to_milestone = round(max(0.0, target_row["points"] - rt_pts), 1)
                 break
 
-        # Pick ±NEIGHBOR_RADIUS wallets around est_rank in `others`
         center_idx = len(higher)
         lo = max(0, center_idx - NEIGHBOR_RADIUS)
         hi = min(len(others), center_idx + NEIGHBOR_RADIUS)
-        neighbor_rows = others[lo:hi]
-        neighbor_addrs = [r["address"] for r in neighbor_rows]
+        neighbor_addrs = {r["address"] for r in others[lo:hi]}
         neighbor_count = len(neighbor_addrs)
 
         lb_ts = _parse_iso_ts(lb_payload.get("last_updated_at"))
         hours_since_lb = max(0.0, (time.time() - lb_ts) / 3600.0) if lb_ts else 0.0
 
-        snap_vel, base_source = _compute_snapshot_velocities(others, lb_ts)
-        habits, habit_scanning = _maybe_trigger_neighbor_scan(neighbor_addrs)
+        pts_vel, vol_vel, habit_source = _compute_snapshot_velocities(others, lb_ts)
 
-        onchain_used = 0
         neighbor_pts_rates: List[float] = []
-        neighbor_order_rates: List[float] = []
         neighbor_vol_rates: List[float] = []
-
         projected_others: List[float] = []
+
         for r in others:
             addr = r["address"]
-            h = habits.get(addr)
-            if h and (time.time() - float(h.get("scanned_at") or 0.0)) <= NEIGHBOR_TTL_SEC * 2:
-                rate = float(h.get("pts_per_hour") or 0.0)
-                if addr in neighbor_addrs:
-                    onchain_used += 1
-                    neighbor_pts_rates.append(rate)
-                    neighbor_order_rates.append(float(h.get("orders_per_hour") or 0.0))
-                    neighbor_vol_rates.append(float(h.get("vol_per_hour") or 0.0))
-            else:
-                rate = snap_vel.get(addr, 0.0)
-                if addr in neighbor_addrs:
-                    neighbor_pts_rates.append(rate)
+            rate = pts_vel.get(addr, 0.0)
+            if addr in neighbor_addrs:
+                neighbor_pts_rates.append(rate)
+                if addr in vol_vel:
+                    neighbor_vol_rates.append(vol_vel[addr])
             projected_others.append(r["points"] + rate * hours_since_lb)
 
         projected_others.sort(reverse=True)
@@ -298,11 +234,8 @@ def compute_leaderboard_status(
             projected_next_rank = projected_rank - 1
             projected_gap_to_next = round(max(0.0, proj_higher[-1] - rt_pts), 1)
 
-        habit_source = "onchain" if onchain_used > 0 else base_source
         if neighbor_pts_rates:
             neighbor_avg_pts_h = round(sum(neighbor_pts_rates) / len(neighbor_pts_rates), 0)
-        if neighbor_order_rates:
-            neighbor_avg_orders_h = round(sum(neighbor_order_rates) / len(neighbor_order_rates), 1)
         if neighbor_vol_rates:
             neighbor_avg_vol_h = round(sum(neighbor_vol_rates) / len(neighbor_vol_rates), 0)
 
@@ -321,9 +254,7 @@ def compute_leaderboard_status(
         "projectedNextRank": projected_next_rank,
         "projectedGapToNext": projected_gap_to_next,
         "neighborAvgPtsPerHour": neighbor_avg_pts_h,
-        "neighborAvgOrdersPerHour": neighbor_avg_orders_h,
         "neighborAvgVolPerHour": neighbor_avg_vol_h,
         "neighborCount": neighbor_count,
         "habitSource": habit_source,
-        "habitScanning": habit_scanning,
     }
