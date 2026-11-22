@@ -16,8 +16,12 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = os.path.join(BASE_DIR, "data", "cache_bsc.json")
 
 LOG_RPC_URLS = [
-    "https://bsc-mainnet.nodereal.io/v1/64a9df0874fb4a93b9d0a3849de012d3",
+    u for u in [
+        os.environ.get("BSC_LOG_RPC_URL", "").strip(),
+        "https://bsc-mainnet.nodereal.io/v1/64a9df0874fb4a93b9d0a3849de012d3",
+    ] if u
 ]
+FALLBACK_SMALL_LOG_RPC = "https://bsc.drpc.org"
 
 GENERAL_RPC_URLS = [
     "https://bsc-rpc.publicnode.com",
@@ -38,6 +42,8 @@ STABLECOINS = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "USR", "USDX"}
 _thread_local = threading.local()
 _fetch_lock = threading.Lock()
 _bnb_price_cache = {"price": None, "ts": 0.0}
+_wallet_result_cache: dict = {}
+WALLET_CACHE_TTL_SEC = 4.0
 
 
 def get_session() -> requests.Session:
@@ -268,21 +274,30 @@ def scan_logs_range(wallet_padded, scan_start, scan_end):
 
     def _fetch_one(args):
         c_start, c_end, topics = args
-        return rpc_call(
+        res = rpc_call(
             "eth_getLogs",
             [{"fromBlock": hex(c_start), "toBlock": hex(c_end), "topics": topics}],
             use_log_rpc=True,
-        ) or []
+            retries=2,
+        )
+        if res is None and (c_end - c_start) <= 95:
+            try:
+                r = get_session().post(
+                    FALLBACK_SMALL_LOG_RPC,
+                    json={"jsonrpc": "2.0", "method": "eth_getLogs", "params": [{"fromBlock": hex(c_start), "toBlock": hex(c_end), "topics": topics}], "id": 1},
+                    timeout=8,
+                ).json()
+                if "result" in r:
+                    return r["result"] or []
+            except Exception:
+                pass
+        return res or []
 
     all_logs = []
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        futures = []
-        for idx, t in enumerate(tasks):
-            futures.append(pool.submit(_fetch_one, t))
-            if idx % 2 == 1:
-                time.sleep(0.08)
-        for fut in as_completed(futures):
-            all_logs.extend(fut.result())
+    for idx, t in enumerate(tasks):
+        all_logs.extend(_fetch_one(t))
+        if idx < len(tasks) - 1:
+            time.sleep(0.2)
     return all_logs
 
 
@@ -398,9 +413,17 @@ def match_orders_fifo(orders: list[dict]) -> tuple[list[dict], dict[str, dict], 
 
 def fetch_wallet_data(wallet: str) -> dict:
     """Fetch and compute bStocks rounds/stats for a wallet using parallel RPC + incremental cache."""
+    wallet_key = wallet.lower()
+    cached_entry = _wallet_result_cache.get(wallet_key)
+    if cached_entry and (time.time() - cached_entry["ts"]) < WALLET_CACHE_TTL_SEC:
+        return cached_entry["data"]
+
     with _fetch_lock:
+        cached_entry = _wallet_result_cache.get(wallet_key)
+        if cached_entry and (time.time() - cached_entry["ts"]) < WALLET_CACHE_TTL_SEC:
+            return cached_entry["data"]
         t_start = time.time()
-        wallet = wallet.lower()
+        wallet = wallet_key
         padded = pad_address(wallet)
 
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -429,7 +452,7 @@ def fetch_wallet_data(wallet: str) -> dict:
         scan_start = start_block
         if w_cache and w_cache.get("start_block", 10**18) <= start_block and w_cache.get("last_block", 0) > start_block:
             cached_logs = w_cache.get("logs", [])
-            scan_start = max(start_block, w_cache["last_block"] - 50)
+            scan_start = max(start_block, w_cache["last_block"] - 10)
 
         new_logs = scan_logs_range(padded, scan_start, end_block)
 
@@ -605,7 +628,7 @@ def fetch_wallet_data(wallet: str) -> dict:
             token_breakdown[t]["spread"] += r["spread"]
 
         total_elapsed = time.time() - t_start
-        return {
+        result = {
             "wallet": wallet,
             "bnbPrice": bnb_price,
             "rounds": rounds,
@@ -623,3 +646,5 @@ def fetch_wallet_data(wallet: str) -> dict:
             "costPer1000": ((total_spread + total_gas) / total_points * 1000) if total_points > 0 else 0,
             "elapsedSeconds": round(total_elapsed, 2),
         }
+        _wallet_result_cache[wallet] = {"ts": time.time(), "data": result}
+        return result
