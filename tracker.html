@@ -380,6 +380,7 @@
         <div class="card-label">Vị trí Leaderboard</div>
         <div class="card-value yellow" id="leaderboardRank">--</div>
         <div class="card-sub" id="leaderboardSub">Đang tra bảng xếp hạng...</div>
+        <div class="card-sub" id="leaderboardHabit" style="color:#58a6ff; margin-top:4px;"></div>
         <div class="card-sub" id="leaderboardUpdated" style="color:#f0b90b; margin-top:4px;"></div>
       </div>
     </div>
@@ -605,10 +606,12 @@ function renderResults(wallet, data) {
 
   const lbRankEl = document.getElementById('leaderboardRank');
   const lbSubEl = document.getElementById('leaderboardSub');
+  const lbHabitEl = document.getElementById('leaderboardHabit');
   const lbUpdEl = document.getElementById('leaderboardUpdated');
   if (lb) {
     const off = lb.officialRank;
     const est = lb.estimatedRank;
+    const proj = lb.projectedRank;
     const tot = lb.totalEntries || 0;
     if (off != null) {
       lbRankEl.textContent = `#${off} / ${tot}`;
@@ -621,10 +624,11 @@ function renderResults(wallet, data) {
       lbRankEl.className = 'card-value';
     }
     const parts = [];
-    if (est != null && off != null && est !== off) {
-      parts.push(`Ước tính hiện tại: ~#${est}`);
-    } else if (off == null && est != null) {
-      parts.push(`Ước tính theo điểm on-chain (${tot} ví)`);
+    if (est != null) {
+      parts.push(`Ước tính thô: ~#${est}`);
+    }
+    if (proj != null) {
+      parts.push(`Dự phóng thói quen: ~#${proj}`);
     }
     if (lb.nextRank != null && lb.gapToNext != null) {
       parts.push(`cách #${lb.nextRank}: +${Math.round(lb.gapToNext).toLocaleString('en-US')} đ`);
@@ -633,12 +637,34 @@ function renderResults(wallet, data) {
       parts.push(`Top ${lb.milestoneRank}: +${Math.round(lb.gapToMilestone).toLocaleString('en-US')} đ`);
     }
     lbSubEl.textContent = parts.length > 0 ? parts.join(' · ') : 'Đang đứng đầu BXH';
+
+    const hParts = [];
+    if (lb.neighborAvgPtsPerHour != null) {
+      hParts.push(`Nhóm ±5 ví: +${Math.round(lb.neighborAvgPtsPerHour).toLocaleString('en-US')} đ/h`);
+    }
+    if (lb.neighborAvgOrdersPerHour != null) {
+      hParts.push(`~${lb.neighborAvgOrdersPerHour} lệnh/h`);
+    }
+    if (lb.neighborAvgVolPerHour != null) {
+      hParts.push(`$${Math.round(lb.neighborAvgVolPerHour).toLocaleString('en-US')}/h`);
+    }
+    const srcLabel = lb.habitSource === 'onchain' ? 'on-chain 12h'
+      : lb.habitSource === 'snapshot' ? 'lịch sử BXH'
+      : 'bình quân campaign';
+    if (hParts.length > 0) {
+      const scanNote = lb.habitScanning && lb.habitSource !== 'onchain' ? ' · đang quét nền on-chain...' : '';
+      lbHabitEl.textContent = `${hParts.join(' · ')} (${srcLabel}${scanNote})`;
+    } else {
+      lbHabitEl.textContent = '';
+    }
+
     const upd = formatLbTime(lb.lastUpdatedAt);
     lbUpdEl.textContent = upd ? `Trust cập nhật: ${upd}` : '';
   } else {
     lbRankEl.textContent = '--';
     lbRankEl.className = 'card-value';
     lbSubEl.textContent = 'Không tải được BXH Trust';
+    lbHabitEl.textContent = '';
     lbUpdEl.textContent = '';
   }
 
