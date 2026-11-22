@@ -17,7 +17,7 @@ from leaderboard_service import compute_leaderboard_status, fetch_leaderboard_ra
 from tracker_service import fetch_wallet_data
 
 DEFAULT_PORT = 8898
-DEFAULT_WALLET = "0xe11795Ee797EcF5603697F1AdF4B92dcC63fA70D"
+DEFAULT_WALLET = ""
 
 
 class TrackerHandler(http.server.SimpleHTTPRequestHandler):
