@@ -373,29 +373,11 @@
     }
     .lb-grid-head, .lb-grid-row {
       display: grid;
-      grid-template-columns: 56px minmax(220px, 1.35fr) minmax(135px, 0.9fr) minmax(140px, 0.95fr) minmax(140px, 0.95fr) minmax(250px, 1.4fr);
+      grid-template-columns: 60px minmax(220px, 1.4fr) minmax(145px, 1fr) minmax(150px, 1fr) minmax(145px, 1fr) minmax(140px, 0.95fr);
       padding: 12px 18px;
       align-items: center;
-      min-width: 960px;
+      min-width: 860px;
     }
-    .lb-win-grid {
-      display: flex;
-      justify-content: flex-end;
-      gap: 4px;
-      flex-wrap: wrap;
-    }
-    .lb-win-pill {
-      font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 5px;
-      border: 1px solid #30363d;
-      background: #0d1117;
-      font-family: monospace;
-      white-space: nowrap;
-    }
-    .lb-win-pill.pos { color: #3fb950; border-color: #23863666; background: #23863618; font-weight: 600; }
-    .lb-win-pill.zero { color: #8b949e; }
-    .lb-win-pill.na { color: #484f58; border-color: #21262d; }
     .lb-grid-head {
       background: #1c2128;
       border-bottom: 1px solid #30363d;
@@ -568,6 +550,13 @@
           <option value="100">Top 100</option>
           <option value="300">Top 300</option>
         </select>
+        <select id="lbWindowSelect" class="lb-select" onchange="onLbWindowChange()">
+          <option value="2">Biến động: 2h</option>
+          <option value="6" selected>Biến động: 6h</option>
+          <option value="12">Biến động: 12h</option>
+          <option value="18">Biến động: 18h</option>
+          <option value="24">Biến động: 24h</option>
+        </select>
         <button type="button" class="lb-btn" id="lbRefreshBtn" onclick="loadLeaderboard(true)">🔄 Tải BXH</button>
         <button type="button" class="lb-btn primary" id="lbScanBtn" onclick="scanLeaderboardFees(false)">🔍 Quét phí chưa có</button>
         <button type="button" class="lb-btn" id="lbRescanBtn" onclick="scanLeaderboardFees(true)">⚡ Quét lại tất cả</button>
@@ -585,7 +574,7 @@
         <div>Điểm dự kiến</div>
         <div>Volume USDT dự kiến</div>
         <div>Phí đã mất</div>
-        <div>Biến động Vol (2·6·12·18·24h)</div>
+        <div id="lbWinHead">Biến động Vol (6h)</div>
       </div>
       <div id="lbTableBody">
         <div style="padding: 36px; text-align: center; color: #8b949e;">Đang tải bảng xếp hạng...</div>
@@ -953,6 +942,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('autoRefreshToggle').checked = savedAuto === '1';
   }
 
+  const savedWin = localStorage.getItem(LS_LB_WINDOW);
+  if (savedWin && ['2', '6', '12', '18', '24'].includes(savedWin)) {
+    document.getElementById('lbWindowSelect').value = savedWin;
+    const head = document.getElementById('lbWinHead');
+    if (head) head.textContent = `Biến động Vol (${savedWin}h)`;
+  }
+
   const savedSec = parseInt(localStorage.getItem(LS_INTERVAL) || '20', 10);
   const validSec = Number.isNaN(savedSec) ? 20 : Math.max(3, Math.min(300, savedSec));
   document.getElementById('refreshSecInput').value = validSec;
@@ -1031,24 +1027,39 @@ async function loadLeaderboard(force) {
   }
 }
 
-function formatShortVol(n) {
-  if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
-  return String(Math.round(n));
+const LS_LB_WINDOW = 'bstock_tracker_lb_window';
+let lastWindowSummary = {};
+
+function getSelectedLbWindow() {
+  const el = document.getElementById('lbWindowSelect');
+  return el ? (el.value || '6') : '6';
+}
+
+function onLbWindowChange() {
+  const w = getSelectedLbWindow();
+  localStorage.setItem(LS_LB_WINDOW, w);
+  const head = document.getElementById('lbWinHead');
+  if (head) head.textContent = `Biến động Vol (${w}h)`;
+  renderDeltaSummary(lastWindowSummary, lbEntries.length);
+  renderLeaderboardTable();
 }
 
 function renderDeltaSummary(ws, count) {
+  lastWindowSummary = ws || {};
   const el = document.getElementById('lbDeltaSummary');
   if (!el) return;
+  const activeW = getSelectedLbWindow();
   const parts = [];
   for (const h of ['2', '6', '12', '18', '24']) {
     const info = ws[h];
+    const isSel = h === activeW;
+    const prefix = isSel ? `<u><b>${h}h:</b></u>` : `<b>${h}h:</b>`;
     if (!info || !info.available) {
-      parts.push(`<span style="color:#6e7681">${h}h: chưa đủ mốc</span>`);
+      parts.push(`<span style="color:#6e7681">${prefix} chưa đủ mốc</span>`);
     } else if (info.activeWallets > 0) {
-      parts.push(`<span style="color:#3fb950"><b>${h}h:</b> ${info.activeWallets}/${count} ví (+$${formatInt(info.totalVolDelta)})</span>`);
+      parts.push(`<span style="color:#3fb950">${prefix} ${info.activeWallets}/${count} ví (+$${formatInt(info.totalVolDelta)})</span>`);
     } else {
-      parts.push(`<span style="color:#8b949e"><b>${h}h:</b> 0 ví (+$0)</span>`);
+      parts.push(`<span style="color:#8b949e">${prefix} 0 ví (+$0)</span>`);
     }
   }
   el.innerHTML = `📊 Biến động Top ${count}: ${parts.join(' · ')}`;
@@ -1108,17 +1119,19 @@ function renderLeaderboardTable() {
       `;
     }
 
+    const w = getSelectedLbWindow();
+    const wHours = parseInt(w, 10) || 6;
     const vd = row.volDeltas || {};
-    const winPills = ['2', '6', '12', '18', '24'].map(h => {
-      const val = vd[h];
-      if (val == null) {
-        return `<span class="lb-win-pill na" title="Chưa có mốc ${h}h">${h}h:—</span>`;
+    const wVal = vd[w];
+    let winCellHtml = '<div class="lb-main-val" style="color:#484f58">—</div><div class="lb-sub">Chưa đủ mốc</div>';
+    if (wVal != null) {
+      if (wVal > 1) {
+        const perHour = wVal / wHours;
+        winCellHtml = `<div class="lb-main-val" style="color:#3fb950">+$${formatInt(wVal)}</div><div class="lb-sub">+$${formatInt(perHour)}/h</div>`;
+      } else {
+        winCellHtml = `<div class="lb-main-val" style="color:#8b949e">$0</div><div class="lb-sub">Đứng yên</div>`;
       }
-      if (val > 1) {
-        return `<span class="lb-win-pill pos" title="Tăng +$${formatInt(val)} trong ${h}h gần nhất">${h}h:+$${formatShortVol(val)}</span>`;
-      }
-      return `<span class="lb-win-pill zero" title="Không tăng trong ${h}h">${h}h:$0</span>`;
-    }).join('');
+    }
 
     html += `
       <div class="lb-grid-row ${isMe ? 'is-me' : ''}" id="lb-row-${addr.toLowerCase()}">
@@ -1142,7 +1155,7 @@ function renderLeaderboardTable() {
           ${pendingVolHtml}
         </div>
         <div>${feeHtml}</div>
-        <div class="lb-win-grid">${winPills}</div>
+        <div>${winCellHtml}</div>
       </div>
     `;
   }
