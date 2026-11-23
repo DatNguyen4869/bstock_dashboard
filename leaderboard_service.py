@@ -258,3 +258,114 @@ def compute_leaderboard_status(
         "neighborCount": neighbor_count,
         "habitSource": habit_source,
     }
+
+
+DELTA_WINDOWS_HOURS = (2, 6, 12, 18, 24)
+
+
+def _pick_window_snapshot(snaps: List[dict], curr_ts: float, hours: int) -> Optional[dict]:
+    """Pick the snapshot closest to `curr_ts - hours * 3600` within a reasonable tolerance."""
+    target_ts = curr_ts - hours * 3600.0
+    min_age = max(0.5, hours - 1.5) * 3600.0
+    max_age = (hours + 2.5) * 3600.0
+    best = None
+    best_diff = float("inf")
+    for s in snaps:
+        s_ts = float(s.get("ts") or 0.0)
+        age = curr_ts - s_ts
+        if age < min_age or age > max_age:
+            continue
+        diff = abs(s_ts - target_ts)
+        if diff < best_diff:
+            best_diff = diff
+            best = s
+    return best
+
+
+def build_leaderboard_table(lb_payload: Optional[dict], limit: int = 300) -> dict:
+    """Build leaderboard table rows enriched with rank/points/volume deltas and 2/6/12/18/24h windows."""
+    if not lb_payload or not isinstance(lb_payload.get("entries"), list):
+        return {"lastUpdatedAt": None, "prevUpdatedAt": None, "totalEntries": 0, "windowSummary": {}, "entries": []}
+
+    upd = lb_payload.get("last_updated_at")
+    curr_ts = _parse_iso_ts(upd) or time.time()
+    raw_entries = lb_payload["entries"]
+    limit = max(1, min(int(limit or 300), len(raw_entries) or 300))
+
+    prev_snap = None
+    window_snaps: Dict[int, Optional[dict]] = {h: None for h in DELTA_WINDOWS_HOURS}
+    with _history_lock:
+        hist = _load_json(LB_HISTORY_FILE, {"snapshots": []})
+    snaps = hist.get("snapshots") if isinstance(hist, dict) else []
+    if isinstance(snaps, list) and snaps:
+        candidates = [s for s in snaps if s.get("last_updated_at") != upd and float(s.get("ts") or 0.0) < curr_ts]
+        if candidates:
+            prev_snap = candidates[-1]
+            for h in DELTA_WINDOWS_HOURS:
+                window_snaps[h] = _pick_window_snapshot(candidates, curr_ts, h)
+
+    prev_ranks: Dict[str, int] = {}
+    prev_pts_map: Dict[str, float] = {}
+    prev_vol_map: Dict[str, float] = {}
+    if prev_snap:
+        prev_pts_map = prev_snap.get("points") or {}
+        prev_vol_map = prev_snap.get("volume") or {}
+        sorted_prev = sorted(prev_pts_map.items(), key=lambda kv: float(kv[1] or 0.0), reverse=True)
+        for idx, (addr, _) in enumerate(sorted_prev, start=1):
+            prev_ranks[addr.lower()] = idx
+
+    window_summary: Dict[str, dict] = {
+        str(h): {"available": window_snaps[h] is not None, "activeWallets": 0, "totalVolDelta": 0.0}
+        for h in DELTA_WINDOWS_HOURS
+    }
+
+    rows: List[Dict[str, Any]] = []
+    for idx, e in enumerate(raw_entries[:limit], start=1):
+        addr = str(e.get("address") or "").strip()
+        addr_low = addr.lower()
+        rank = int(e.get("rank") or idx)
+        pts = float(e.get("points") or 0.0)
+        vol = float(e.get("volume") or 0.0)
+
+        rank_delta = None
+        pts_delta = None
+        vol_delta = None
+        if prev_snap and addr_low in prev_pts_map:
+            rank_delta = prev_ranks[addr_low] - rank
+            pts_delta = pts - float(prev_pts_map.get(addr_low) or 0.0)
+            vol_delta = vol - float(prev_vol_map.get(addr_low) or 0.0)
+
+        vol_deltas: Dict[str, Optional[float]] = {}
+        for h in DELTA_WINDOWS_HOURS:
+            ws = window_snaps[h]
+            key = str(h)
+            if ws and addr_low in (ws.get("volume") or {}):
+                dv = max(0.0, vol - float(ws["volume"].get(addr_low) or 0.0))
+                vol_deltas[key] = round(dv, 2)
+                if dv > 1.0:
+                    window_summary[key]["activeWallets"] += 1
+                    window_summary[key]["totalVolDelta"] += dv
+            else:
+                vol_deltas[key] = None
+
+        rows.append({
+            "rank": rank,
+            "address": addr,
+            "officialPoints": pts,
+            "officialVolume": vol,
+            "rankDelta": rank_delta,
+            "pointsDelta": pts_delta,
+            "volumeDelta": vol_delta,
+            "volDeltas": vol_deltas,
+        })
+
+    for key in window_summary:
+        window_summary[key]["totalVolDelta"] = round(window_summary[key]["totalVolDelta"], 2)
+
+    return {
+        "lastUpdatedAt": upd,
+        "prevUpdatedAt": prev_snap.get("last_updated_at") if prev_snap else None,
+        "totalEntries": len(raw_entries),
+        "windowSummary": window_summary,
+        "entries": rows,
+    }

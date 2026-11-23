@@ -306,10 +306,163 @@
         padding: 8px 10px;
       }
     }
+
+    /* Tabs & Leaderboard Fee Table */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #161b22;
+      color: #8b949e;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tab-btn:hover { color: #e6edf3; border-color: #58a6ff; }
+    .tab-btn.active {
+      background: #1f2937;
+      color: #f0b90b;
+      border-color: #f0b90b;
+    }
+
+    .lb-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .lb-select {
+      padding: 8px 12px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: 13px;
+      outline: none;
+    }
+    .lb-btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: #21262d;
+      color: #e6edf3;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .lb-btn:hover { border-color: #f0b90b; color: #f0b90b; }
+    .lb-btn.primary { background: #f0b90b; color: #0d1117; border-color: #f0b90b; }
+    .lb-btn.primary:hover { background: #d9a406; color: #0d1117; }
+    .lb-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .lb-meta { font-size: 12px; color: #8b949e; margin-left: auto; }
+
+    .lb-table-wrap {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+    .lb-grid-head, .lb-grid-row {
+      display: grid;
+      grid-template-columns: 56px minmax(220px, 1.35fr) minmax(135px, 0.9fr) minmax(140px, 0.95fr) minmax(140px, 0.95fr) minmax(250px, 1.4fr);
+      padding: 12px 18px;
+      align-items: center;
+      min-width: 960px;
+    }
+    .lb-win-grid {
+      display: flex;
+      justify-content: flex-end;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .lb-win-pill {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 5px;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      font-family: monospace;
+      white-space: nowrap;
+    }
+    .lb-win-pill.pos { color: #3fb950; border-color: #23863666; background: #23863618; font-weight: 600; }
+    .lb-win-pill.zero { color: #8b949e; }
+    .lb-win-pill.na { color: #484f58; border-color: #21262d; }
+    .lb-grid-head {
+      background: #1c2128;
+      border-bottom: 1px solid #30363d;
+      font-size: 12px;
+      color: #8b949e;
+      font-weight: 600;
+    }
+    .lb-grid-head > div:nth-child(n+3),
+    .lb-grid-row > div:nth-child(n+3) {
+      text-align: right;
+    }
+    .lb-grid-row {
+      border-bottom: 1px solid #21262d;
+      font-size: 14px;
+      transition: background 0.15s;
+    }
+    .lb-grid-row:hover { background: #1c2128; }
+    .lb-grid-row.is-me {
+      background: rgba(240, 185, 11, 0.08);
+      border-left: 3px solid #f0b90b;
+    }
+    .lb-rank { font-weight: 700; color: #e6edf3; font-size: 15px; }
+    .lb-addr-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .lb-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .lb-addr-text {
+      font-family: monospace;
+      font-size: 13px;
+      color: #e6edf3;
+      cursor: pointer;
+    }
+    .lb-addr-text:hover { color: #f0b90b; text-decoration: underline; }
+    .lb-icon-btn {
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 4px;
+      text-decoration: none;
+    }
+    .lb-icon-btn:hover { color: #e6edf3; }
+    .lb-rank-up { color: #3fb950; font-size: 12px; font-weight: 700; }
+    .lb-rank-down { color: #f85149; font-size: 12px; font-weight: 700; }
+    .lb-main-val { font-weight: 700; font-size: 16px; color: #e6edf3; }
+    .lb-delta-pos { font-size: 12px; color: #3fb950; margin-top: 2px; }
+    .lb-pending { font-size: 12px; color: #f0b90b; margin-top: 2px; }
+    .lb-sub { font-size: 12px; color: #8b949e; margin-top: 2px; }
   </style>
 </head>
 <body>
 
+  <div class="tab-bar">
+    <button type="button" class="tab-btn active" id="tabWalletBtn" onclick="switchTab('wallet')">📒 Nhật ký ví</button>
+    <button type="button" class="tab-btn" id="tabLbBtn" onclick="switchTab('leaderboard')">🏆 BXH &amp; Phí Top</button>
+  </div>
+
+  <div id="walletSection">
   <div class="panel">
     <div class="input-row">
       <div class="input-group" style="flex: 2;">
@@ -400,6 +553,43 @@
         <div>Điểm</div>
       </div>
       <div class="table-body" id="tableBody"></div>
+    </div>
+  </div>
+  </div> <!-- /walletSection -->
+
+  <div id="leaderboardSection" class="hidden">
+    <div class="panel">
+      <div class="lb-controls">
+        <select id="lbLimitSelect" class="lb-select" onchange="loadLeaderboard(false)">
+          <option value="10">Top 10</option>
+          <option value="20" selected>Top 20</option>
+          <option value="30">Top 30</option>
+          <option value="50">Top 50</option>
+          <option value="100">Top 100</option>
+          <option value="300">Top 300</option>
+        </select>
+        <button type="button" class="lb-btn" id="lbRefreshBtn" onclick="loadLeaderboard(true)">🔄 Tải BXH</button>
+        <button type="button" class="lb-btn primary" id="lbScanBtn" onclick="scanLeaderboardFees(false)">🔍 Quét phí chưa có</button>
+        <button type="button" class="lb-btn" id="lbRescanBtn" onclick="scanLeaderboardFees(true)">⚡ Quét lại tất cả</button>
+        <button type="button" class="lb-btn hidden" id="lbStopScanBtn" onclick="stopLbScan()">⏹ Dừng quét</button>
+        <span class="lb-meta" id="lbMetaText">Chưa tải BXH</span>
+      </div>
+      <div class="status" id="lbStatusText"></div>
+      <div class="status" id="lbDeltaSummary" style="margin-top:6px; font-size:12px;"></div>
+    </div>
+
+    <div class="lb-table-wrap">
+      <div class="lb-grid-head">
+        <div>#</div>
+        <div>Địa chỉ</div>
+        <div>Điểm dự kiến</div>
+        <div>Volume USDT dự kiến</div>
+        <div>Phí đã mất</div>
+        <div>Biến động Vol (2·6·12·18·24h)</div>
+      </div>
+      <div id="lbTableBody">
+        <div style="padding: 36px; text-align: center; color: #8b949e;">Đang tải bảng xếp hạng...</div>
+      </div>
     </div>
   </div>
 
@@ -770,6 +960,257 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   await startFetch(false);
 });
+
+// ================= BXH & PHÍ TOP =================
+let lbEntries = [];
+let lbScanning = false;
+let lbAbortScan = false;
+
+function switchTab(tab) {
+  const isLb = tab === 'leaderboard';
+  document.getElementById('walletSection').classList.toggle('hidden', isLb);
+  document.getElementById('leaderboardSection').classList.toggle('hidden', !isLb);
+  document.getElementById('tabWalletBtn').classList.toggle('active', !isLb);
+  document.getElementById('tabLbBtn').classList.toggle('active', isLb);
+  if (isLb && lbEntries.length === 0) {
+    loadLeaderboard(false);
+  }
+}
+
+function shortAddr(addr) {
+  if (!addr || addr.length < 12) return addr || '';
+  return addr.slice(0, 6) + '...' + addr.slice(-4);
+}
+
+function avatarGradient(addr) {
+  const s = (addr || '0x000000').toLowerCase();
+  const h1 = parseInt(s.slice(2, 6), 16) % 360;
+  const h2 = (h1 + 65) % 360;
+  return `linear-gradient(135deg, hsl(${h1}, 75%, 55%), hsl(${h2}, 75%, 45%))`;
+}
+
+function copyAddr(addr, btn) {
+  navigator.clipboard.writeText(addr).then(() => {
+    const old = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(() => { btn.textContent = old; }, 1000);
+  }).catch(() => {});
+}
+
+function formatInt(n) {
+  return Math.round(n || 0).toLocaleString('en-US');
+}
+
+function inspectWalletFromLb(addr) {
+  document.getElementById('walletInput').value = addr;
+  switchTab('wallet');
+  startFetch(false);
+}
+
+async function loadLeaderboard(force) {
+  const limit = document.getElementById('lbLimitSelect').value || '20';
+  const statusEl = document.getElementById('lbStatusText');
+  const metaEl = document.getElementById('lbMetaText');
+  statusEl.innerHTML = '<span class="spinner"></span> Đang tải BXH từ Trust Wallet...';
+  try {
+    const resp = await fetch(`/leaderboard?limit=${encodeURIComponent(limit)}&force=${force ? '1' : '0'}`);
+    const data = await resp.json();
+    if (data.error) {
+      statusEl.innerHTML = `<span style="color:#f85149">Lỗi: ${data.error}</span>`;
+      return;
+    }
+    lbEntries = data.entries || [];
+    const updStr = data.lastUpdatedAt ? new Date(data.lastUpdatedAt).toLocaleString('vi-VN') : '--';
+    const scannedCount = lbEntries.filter(e => !!e.onchain).length;
+    metaEl.textContent = `Cập nhật BXH: ${updStr} · ${lbEntries.length}/${data.totalEntries || lbEntries.length} ví · Đã quét phí: ${scannedCount}/${lbEntries.length}`;
+    renderDeltaSummary(data.windowSummary || {}, lbEntries.length);
+    statusEl.textContent = '';
+    renderLeaderboardTable();
+  } catch (e) {
+    statusEl.innerHTML = `<span style="color:#f85149">Lỗi tải BXH: ${e.message}</span>`;
+  }
+}
+
+function formatShortVol(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return String(Math.round(n));
+}
+
+function renderDeltaSummary(ws, count) {
+  const el = document.getElementById('lbDeltaSummary');
+  if (!el) return;
+  const parts = [];
+  for (const h of ['2', '6', '12', '18', '24']) {
+    const info = ws[h];
+    if (!info || !info.available) {
+      parts.push(`<span style="color:#6e7681">${h}h: chưa đủ mốc</span>`);
+    } else if (info.activeWallets > 0) {
+      parts.push(`<span style="color:#3fb950"><b>${h}h:</b> ${info.activeWallets}/${count} ví (+$${formatInt(info.totalVolDelta)})</span>`);
+    } else {
+      parts.push(`<span style="color:#8b949e"><b>${h}h:</b> 0 ví (+$0)</span>`);
+    }
+  }
+  el.innerHTML = `📊 Biến động Top ${count}: ${parts.join(' · ')}`;
+}
+
+function renderLeaderboardTable() {
+  const body = document.getElementById('lbTableBody');
+  const myWallet = (document.getElementById('walletInput').value || '').trim().toLowerCase();
+  if (!lbEntries.length) {
+    body.innerHTML = '<div style="padding:36px; text-align:center; color:#8b949e;">Không có dữ liệu BXH.</div>';
+    return;
+  }
+
+  let html = '';
+  for (const row of lbEntries) {
+    const addr = row.address || '';
+    const isMe = myWallet && addr.toLowerCase() === myWallet;
+    const oc = row.onchain || null;
+
+    const estPts = oc ? Math.max(row.officialPoints, oc.totalPoints) : row.officialPoints;
+    const estVol = oc ? Math.max(row.officialVolume, oc.totalVolume) : row.officialVolume;
+    const pendingPts = oc ? Math.max(0, oc.totalPoints - row.officialPoints) : 0;
+    const pendingVol = oc ? Math.max(0, oc.totalVolume - row.officialVolume) : 0;
+    const hasPending = pendingPts >= 100;
+
+    let rankBadge = '';
+    if (row.rankDelta && row.rankDelta > 0) {
+      rankBadge = `<span class="lb-rank-up">▲${row.rankDelta}</span>`;
+    } else if (row.rankDelta && row.rankDelta < 0) {
+      rankBadge = `<span class="lb-rank-down">▼${Math.abs(row.rankDelta)}</span>`;
+    }
+
+    const ptsDeltaHtml = (row.pointsDelta && row.pointsDelta > 1)
+      ? `<div class="lb-delta-pos">+${formatInt(row.pointsDelta)}</div>`
+      : '';
+    const volDeltaHtml = (row.volumeDelta && row.volumeDelta > 1)
+      ? `<div class="lb-delta-pos">+$${formatInt(row.volumeDelta)}</div>`
+      : '';
+
+    const pendingPtsHtml = hasPending
+      ? `<div class="lb-pending">⏳ +${formatInt(pendingPts)} chưa cộng</div>`
+      : '';
+    const pendingVolHtml = hasPending
+      ? `<div class="lb-pending">⏳ +$${formatInt(pendingVol)}</div>`
+      : '';
+
+    let feeHtml = '<div class="lb-sub">Chưa quét</div>';
+    if (oc) {
+      const feeColor = oc.totalFee > 0 ? '#e6edf3' : '#3fb950';
+      const holdHtml = oc.holdingCost > 1
+        ? `<div class="lb-sub" style="color:#f0b90b">Đang giữ ~$${formatInt(oc.holdingCost)}</div>`
+        : '';
+      feeHtml = `
+        <div class="lb-main-val" style="color:${feeColor}">$${(oc.totalFee || 0).toFixed(2)}</div>
+        ${holdHtml}
+        <div class="lb-sub">$${(oc.costPer1000 || 0).toFixed(3)}/1k điểm</div>
+      `;
+    }
+
+    const vd = row.volDeltas || {};
+    const winPills = ['2', '6', '12', '18', '24'].map(h => {
+      const val = vd[h];
+      if (val == null) {
+        return `<span class="lb-win-pill na" title="Chưa có mốc ${h}h">${h}h:—</span>`;
+      }
+      if (val > 1) {
+        return `<span class="lb-win-pill pos" title="Tăng +$${formatInt(val)} trong ${h}h gần nhất">${h}h:+$${formatShortVol(val)}</span>`;
+      }
+      return `<span class="lb-win-pill zero" title="Không tăng trong ${h}h">${h}h:$0</span>`;
+    }).join('');
+
+    html += `
+      <div class="lb-grid-row ${isMe ? 'is-me' : ''}" id="lb-row-${addr.toLowerCase()}">
+        <div class="lb-rank">${row.rank}</div>
+        <div class="lb-addr-cell">
+          <div class="lb-avatar" style="background:${avatarGradient(addr)}"></div>
+          <span class="lb-addr-text" title="Click để xem chi tiết ví ${addr}" onclick="inspectWalletFromLb('${addr}')">${shortAddr(addr)}${isMe ? ' (Bạn)' : ''}</span>
+          <button type="button" class="lb-icon-btn" title="Copy địa chỉ" onclick="copyAddr('${addr}', this)">📋</button>
+          <a class="lb-icon-btn" title="Mở trên BscScan" href="https://bscscan.com/address/${addr}" target="_blank" rel="noopener">📜</a>
+          ${hasPending ? '<span title="Có điểm on-chain chưa cộng lên BXH">⏳</span>' : ''}
+          ${rankBadge}
+        </div>
+        <div>
+          <div class="lb-main-val">${formatInt(estPts)}</div>
+          ${ptsDeltaHtml}
+          ${pendingPtsHtml}
+        </div>
+        <div>
+          <div class="lb-main-val">$${formatInt(estVol)}</div>
+          ${volDeltaHtml}
+          ${pendingVolHtml}
+        </div>
+        <div>${feeHtml}</div>
+        <div class="lb-win-grid">${winPills}</div>
+      </div>
+    `;
+  }
+  body.innerHTML = html;
+}
+
+function stopLbScan() {
+  lbAbortScan = true;
+}
+
+async function scanLeaderboardFees(rescanAll) {
+  if (lbScanning) return;
+  if (!lbEntries.length) await loadLeaderboard(false);
+
+  const targets = rescanAll ? lbEntries : lbEntries.filter(e => !e.onchain);
+  const statusEl = document.getElementById('lbStatusText');
+  if (!targets.length) {
+    statusEl.textContent = '✅ Tất cả ví trong danh sách đã có dữ liệu phí!';
+    return;
+  }
+
+  lbScanning = true;
+  lbAbortScan = false;
+  document.getElementById('lbScanBtn').disabled = true;
+  document.getElementById('lbRescanBtn').disabled = true;
+  document.getElementById('lbStopScanBtn').classList.remove('hidden');
+
+  let done = 0;
+  let idx = 0;
+  const total = targets.length;
+  const concurrency = 2;
+
+  const updateProgress = () => {
+    statusEl.innerHTML = `<span class="spinner"></span> Đang quét phí on-chain: <b>${done}/${total}</b> ví...`;
+    const scannedCount = lbEntries.filter(e => !!e.onchain).length;
+    const metaEl = document.getElementById('lbMetaText');
+    metaEl.textContent = metaEl.textContent.replace(/Đã quét phí: \d+\/\d+/, `Đã quét phí: ${scannedCount}/${lbEntries.length}`);
+  };
+  updateProgress();
+
+  async function worker() {
+    while (!lbAbortScan) {
+      const curIdx = idx++;
+      if (curIdx >= total) break;
+      const row = targets[curIdx];
+      try {
+        const resp = await fetch(`/leaderboard/wallet?wallet=${encodeURIComponent(row.address)}`);
+        const res = await resp.json();
+        if (res && res.onchain) {
+          row.onchain = res.onchain;
+          renderLeaderboardTable();
+        }
+      } catch (_) {}
+      done++;
+      updateProgress();
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+  lbScanning = false;
+  document.getElementById('lbScanBtn').disabled = false;
+  document.getElementById('lbRescanBtn').disabled = false;
+  document.getElementById('lbStopScanBtn').classList.add('hidden');
+  statusEl.textContent = lbAbortScan
+    ? `⏹ Đã dừng quét (${done}/${total} ví).`
+    : `✅ Quét xong ${done}/${total} ví!`;
+}
 </script>
 
 </body>
