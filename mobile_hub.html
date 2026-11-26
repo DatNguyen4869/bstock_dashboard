@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0d1117">
+  <title>bStocks 3-Acc Mobile Hub</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    body {
+      padding: calc(env(safe-area-inset-top, 12px) + 10px) 14px calc(env(safe-area-inset-bottom, 16px) + 24px);
+      max-width: 460px;
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .topbar h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f0b90b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .icon-btn {
+      min-width: 40px;
+      height: 40px;
+      padding: 0 10px;
+      border-radius: 10px;
+      border: 1px solid #30363d;
+      background: #161b22;
+      color: #e6edf3;
+      font-size: 15px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .icon-btn:active { opacity: 0.7; }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .sum-box {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 10px 10px;
+    }
+    .sum-label { font-size: 11px; color: #8b949e; margin-bottom: 3px; }
+    .sum-val { font-size: 15px; font-weight: 700; color: #e6edf3; }
+    .sum-val.yellow { color: #f0b90b; }
+    .sum-val.red { color: #f85149; }
+
+    .control-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .refresh-select {
+      height: 42px;
+      padding: 0 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      color: #e6edf3;
+      font-size: 13px;
+      font-weight: 600;
+      outline: none;
+    }
+    .btn-stop-all {
+      flex: 1;
+      height: 42px;
+      border: none;
+      border-radius: 10px;
+      background: #da3633;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-stop-all:active { opacity: 0.8; }
+
+    .acc-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .acc-card.running { border-color: #238636; }
+    .acc-card.stopped { border-color: #da3633; }
+
+    .acc-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .acc-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #e6edf3;
+    }
+    .badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #21262d;
+      color: #8b949e;
+      border: 1px solid #30363d;
+      white-space: nowrap;
+    }
+    .badge.running { background: #23863628; color: #3fb950; border-color: #238636; }
+    .badge.dry { background: #f0b90b22; color: #f0b90b; border-color: #f0b90b; }
+    .badge.stopped { background: #f8514922; color: #f85149; border-color: #f85149; }
+    .badge.offline { background: #30363d44; color: #8b949e; border-color: #484f58; }
+
+    .acc-sub {
+      font-size: 12px;
+      color: #8b949e;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .metric {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+    .metric-lbl { font-size: 11px; color: #8b949e; margin-bottom: 2px; }
+    .metric-val { font-size: 15px; font-weight: 700; color: #e6edf3; }
+    .metric-sub { font-size: 11px; color: #8b949e; margin-top: 1px; }
+
+    .reason-line {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 0.8fr 0.8fr;
+      gap: 8px;
+    }
+    .act-btn {
+      height: 44px;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .act-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .act-btn:active:not(:disabled) { opacity: 0.78; }
+    .btn-start { background: #238636; color: #fff; }
+    .btn-stop { background: #da3633; color: #fff; }
+    .btn-dark { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
+
+    .log-drawer {
+      margin-top: 10px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #c9d1d9;
+      max-height: 180px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .hidden { display: none !important; }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-sheet {
+      width: 100%;
+      max-width: 460px;
+      max-height: 88vh;
+      overflow-y: auto;
+      background: #161b22;
+      border-top: 1px solid #30363d;
+      border-radius: 18px 18px 0 0;
+      padding: 18px 16px calc(env(safe-area-inset-bottom, 16px) + 18px);
+    }
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .modal-head h2 { font-size: 16px; color: #f0b90b; }
+    .cfg-block {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .cfg-block h3 { font-size: 13px; color: #58a6ff; margin-bottom: 8px; }
+    .cfg-field { margin-bottom: 8px; }
+    .cfg-field label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 3px; }
+    .cfg-field input {
+      width: 100%;
+      height: 40px;
+      padding: 0 10px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: 14px;
+      font-family: ui-monospace, monospace;
+      outline: none;
+    }
+    .btn-save {
+      width: 100%;
+      height: 46px;
+      border: none;
+      border-radius: 10px;
+      background: #f0b90b;
+      color: #0d1117;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+    .toast {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom, 16px) + 18px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e6edf3;
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      z-index: 200;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <h1>📱 bStocks 3-Acc Hub</h1>
+    <div class="top-actions">
+      <a class="icon-btn" href="/" title="Bản Desktop" style="text-decoration:none;">🖥️</a>
+      <button type="button" class="icon-btn" onclick="openConfigModal()" title="Cấu hình 3 máy">⚙️</button>
+      <button type="button" class="icon-btn" id="refreshBtn" onclick="refreshAll(true)" title="Làm mới ngay">🔄</button>
+    </div>
+  </div>
+
+  <div class="summary-strip">
+    <div class="sum-box">
+      <div class="sum-label">Đang chạy</div>
+      <div class="sum-val" id="sumRunning">0 / 3</div>
+    </div>
+    <div class="sum-box">
+      <div class="sum-label">Tổng điểm</div>
+      <div class="sum-val yellow" id="sumPoints">0</div>
+    </div>
+    <div class="sum-box">
+      <div class="sum-label">Tổng phí</div>
+      <div class="sum-val red" id="sumFees">$0.00</div>
+    </div>
+  </div>
+
+  <div class="control-bar">
+    <select id="pollIntervalSel" class="refresh-select" onchange="onIntervalChange()">
+      <option value="10">⏱️ 10s</option>
+      <option value="15" selected>⏱️ 15s</option>
+      <option value="20">⏱️ 20s</option>
+      <option value="30">⏱️ 30s</option>
+      <option value="0">⏸️ Tắt auto</option>
+    </select>
+    <button type="button" class="btn-stop-all" onclick="stopAllAccounts()">🛑 DỪNG TẤT CẢ (STOP ALL)</button>
+  </div>
+
+  <div id="cardsContainer"></div>
+
+  <div id="configModal" class="modal-backdrop hidden" onclick="if(event.target===this) closeConfigModal()">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h2>⚙️ Cấu hình 3 máy (Tailscale / LAN)</h2>
+        <button type="button" class="icon-btn" onclick="closeConfigModal()">✕</button>
+      </div>
+      <p style="font-size:12px; color:#8b949e; margin-bottom:10px; line-height:1.45;">
+        Bật <b>Tailscale</b> trên iPhone &amp; 3 máy chạy tool. Nhập URL từng máy dạng <code>http://100.x.x.x:8899</code> (nhớ cho <code>dashboard_server.py</code> bind <code>0.0.0.0</code>).
+      </p>
+      <div id="cfgFields"></div>
+      <button type="button" class="btn-save" onclick="saveConfigModal()">💾 Lưu cấu hình</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+<script>
+const LS_ACCS = 'bstock_mobile_hub_accounts_v1';
+const LS_INT = 'bstock_mobile_hub_interval_v1';
+
+const DEFAULT_ACCOUNTS = [
+  { id: 0, name: 'Acc 1 · PC', url: '', wallet: '' },
+  { id: 1, name: 'Acc 2 · Laptop', url: '', wallet: '' },
+  { id: 2, name: 'Acc 3 · Máy 3', url: '', wallet: '' },
+];
+
+let accounts = loadAccounts();
+let stateByAcc = accounts.map(() => ({
+  status: null,
+  walletData: null,
+  lastRoundSeq: -1,
+  lastChainFetchAt: 0,
+  showLogs: false,
+  offline: false,
+  error: '',
+}));
+let pollTimer = null;
+let toastTimer = null;
+
+function loadAccounts() {
+  try {
+    const raw = localStorage.getItem(LS_ACCS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length === 3) return parsed;
+    }
+  } catch (_) {}
+  return DEFAULT_ACCOUNTS.map(a => ({ ...a }));
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2400);
+}
+
+function cleanBaseUrl(url) {
+  return String(url || '').trim().replace(/\/+$/, '');
+}
+
+async function proxyRequest(targetUrl, method = 'GET', payload = null) {
+  const resp = await fetch('/hub/proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url: targetUrl, method, payload }),
+  });
+  return await resp.json();
+}
+
+function shortAddr(a) {
+  if (!a || a.length < 12) return a || 'Chưa có ví';
+  return `${a.slice(0, 6)}...${a.slice(-4)}`;
+}
+
+function fmtInt(n) {
+  return Math.round(Number(n || 0)).toLocaleString('en-US');
+}
+
+function fmtUsd(n) {
+  const v = Number(n || 0);
+  if (Math.abs(v) >= 100) return '$' + v.toFixed(1);
+  return '$' + v.toFixed(2);
+}
+
+async function refreshAccount(idx, forceChain = false) {
+  const acc = accounts[idx];
+  const st = stateByAcc[idx];
+  const base = cleanBaseUrl(acc.url);
+
+  if (base) {
+    try {
+      const s = await proxyRequest(`${base}/swapper/status`, 'GET');
+      if (s && s.offline) {
+        st.offline = true;
+        st.status = null;
+        st.error = 'Máy offline / không kết nối được';
+      } else {
+        st.offline = false;
+        st.status = s;
+        st.error = '';
+      }
+      if (!acc.wallet && !st.offline) {
+        try {
+          const cfg = await proxyRequest(`${base}/swapper/config`, 'GET');
+          if (cfg && cfg.wallet_address) {
+            acc.wallet = cfg.wallet_address.trim();
+            localStorage.setItem(LS_ACCS, JSON.stringify(accounts));
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      st.offline = true;
+      st.error = e.message;
+    }
+  } else {
+    st.offline = false;
+    st.status = null;
+  }
+
+  const wallet = (acc.wallet || '').trim();
+  const roundChanged = st.status && st.status.roundSeq > st.lastRoundSeq;
+  const staleChain = (Date.now() - st.lastChainFetchAt) > 25000;
+
+  if (wallet && wallet.startsWith('0x') && (forceChain || roundChanged || staleChain || !st.walletData)) {
+    try {
+      const resp = await fetch(`/fetch-data?wallet=${encodeURIComponent(wallet)}`);
+      const d = await resp.json();
+      if (d && !d.error) {
+        st.walletData = d;
+        st.lastChainFetchAt = Date.now();
+        if (st.status) st.lastRoundSeq = st.status.roundSeq;
+      }
+    } catch (_) {}
+  }
+}
+
+async function refreshAll(forceChain = false) {
+  const btn = document.getElementById('refreshBtn');
+  btn.textContent = '⏳';
+  await Promise.all([0, 1, 2].map(i => refreshAccount(i, forceChain)));
+  btn.textContent = '🔄';
+  renderCards();
+}
+
+function renderSummary() {
+  let runCount = 0;
+  let totalPts = 0;
+  let totalFees = 0;
+  for (let i = 0; i < 3; i++) {
+    const st = stateByAcc[i];
+    if (st.status && st.status.running) runCount++;
+    if (st.walletData) {
+      totalPts += Number(st.walletData.totalPoints || 0);
+      totalFees += Number(st.walletData.totalFee || 0);
+    }
+  }
+  document.getElementById('sumRunning').textContent = `${runCount} / 3`;
+  document.getElementById('sumPoints').textContent = fmtInt(totalPts);
+  document.getElementById('sumFees').textContent = fmtUsd(totalFees);
+}
+
+function renderCards() {
+  renderSummary();
+  const container = document.getElementById('cardsContainer');
+  let html = '';
+
+  for (let i = 0; i < 3; i++) {
+    const acc = accounts[i];
+    const st = stateByAcc[i];
+    const base = cleanBaseUrl(acc.url);
+    const sw = st.status;
+    const wd = st.walletData;
+
+    const running = !!(sw && sw.running);
+    const stoppedAlert = !!(sw && !running && sw.lastStopReason && sw.lastStopReason.includes('DỪNG'));
+
+    let badgeCls = 'badge';
+    let badgeText = base ? 'Đang rảnh' : 'Chưa gắn URL';
+    if (st.offline) {
+      badgeCls = 'badge offline';
+      badgeText = 'Offline';
+    } else if (running) {
+      badgeCls = sw.mode === 'running' ? 'badge running' : 'badge dry';
+      badgeText = sw.mode === 'running'
+        ? `Chạy ${sw.currentRound ? 'V' + sw.currentRound : '...'}`
+        : `Dry-run`;
+    } else if (stoppedAlert) {
+      badgeCls = 'badge stopped';
+      badgeText = 'Đã dừng';
+    }
+
+    const lb = wd && wd.leaderboard ? wd.leaderboard : null;
+    const rankStr = lb
+      ? (lb.projectedRank ? `~#${lb.projectedRank}` : (lb.officialRank ? `#${lb.officialRank}` : '--'))
+      : '--';
+
+    const ptsStr = wd ? fmtInt(wd.totalPoints) : '--';
+    const volStr = wd ? '$' + fmtInt(wd.totalVolume) : '--';
+    const feeStr = wd ? fmtUsd(wd.totalFee) : '--';
+    const costPer1k = wd ? `$${Number(wd.costPer1000 || 0).toFixed(3)}/1k` : 'Chưa có ví';
+    const consecStr = sw && sw.consecInfo ? sw.consecInfo : '--';
+    const elapsedStr = running && sw ? `${sw.elapsedSeconds}s` : '';
+
+    const reasonText = st.offline
+      ? st.error
+      : (sw && sw.lastStopReason ? sw.lastStopReason : (base ? 'Sẵn sàng nhận lệnh' : 'Bấm ⚙️ để nhập URL máy này'));
+
+    const logsText = sw && sw.logs && sw.logs.length
+      ? sw.logs.slice(-25).join('\n')
+      : 'Chưa có log.';
+
+    html += `
+      <div class="acc-card ${running ? 'running' : (stoppedAlert ? 'stopped' : '')}">
+        <div class="acc-head">
+          <div class="acc-name">${escapeHtml(acc.name)}</div>
+          <span class="${badgeCls}">${badgeText}${elapsedStr ? ' · ' + elapsedStr : ''}</span>
+        </div>
+        <div class="acc-sub">
+          <span>${shortAddr(acc.wallet)}</span>
+          <span>Rank: <b style="color:#f0b90b">${rankStr}</b></span>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric">
+            <div class="metric-lbl">Điểm</div>
+            <div class="metric-val" style="color:#f0b90b">${ptsStr}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-lbl">Volume</div>
+            <div class="metric-val">${volStr}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-lbl">Phí đã mất</div>
+            <div class="metric-val" style="color:#f85149">${feeStr}</div>
+            <div class="metric-sub">${costPer1k}</div>
+          </div>
+          <div class="metric">
+            <div class="metric-lbl">Chuỗi lỗ cao</div>
+            <div class="metric-val" style="font-size:13px">${escapeHtml(consecStr)}</div>
+          </div>
+        </div>
+
+        <div class="reason-line">${escapeHtml(reasonText)}</div>
+
+        <div class="btn-grid">
+          <button type="button" class="act-btn btn-start" onclick="sendAction(${i}, 'start')" ${(!base || st.offline || running) ? 'disabled' : ''}>▶️ Start</button>
+          <button type="button" class="act-btn btn-stop" onclick="sendAction(${i}, 'stop')" ${(!base || st.offline || !running) ? 'disabled' : ''}>🛑 Stop</button>
+          <button type="button" class="act-btn btn-dark" onclick="sendAction(${i}, 'dry-run')" ${(!base || st.offline || running) ? 'disabled' : ''}>🧪 Dry</button>
+          <button type="button" class="act-btn btn-dark" onclick="toggleLogs(${i})">📜 Log</button>
+        </div>
+
+        <div class="log-drawer ${st.showLogs ? '' : 'hidden'}" id="log-${i}">${escapeHtml(logsText)}</div>
+      </div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+function toggleLogs(idx) {
+  stateByAcc[idx].showLogs = !stateByAcc[idx].showLogs;
+  renderCards();
+  if (stateByAcc[idx].showLogs) {
+    const el = document.getElementById(`log-${idx}`);
+    if (el) el.scrollTop = el.scrollHeight;
+  }
+}
+
+async function sendAction(idx, action) {
+  const acc = accounts[idx];
+  const base = cleanBaseUrl(acc.url);
+  if (!base) return;
+
+  if (action === 'start') {
+    if (!confirm(`Bắt đầu Auto Swap trên "${acc.name}"?`)) return;
+  }
+  try {
+    const res = await proxyRequest(`${base}/swapper/${action}`, 'POST', {});
+    if (res && res.ok === false) {
+      showToast(`❌ ${acc.name}: ${res.error || 'Lỗi'}`);
+    } else {
+      showToast(`✅ Đã gửi ${action.toUpperCase()} → ${acc.name}`);
+      await refreshAccount(idx, false);
+      renderCards();
+    }
+  } catch (e) {
+    showToast(`❌ Lỗi: ${e.message}`);
+  }
+}
+
+async function stopAllAccounts() {
+  const targets = accounts.map((a, i) => ({ a, i })).filter(x => cleanBaseUrl(x.a.url));
+  if (!targets.length) {
+    showToast('⚠️ Chưa cấu hình URL máy nào');
+    return;
+  }
+  if (!confirm(`Gửi lệnh DỪNG KHẨN CẤP tới cả ${targets.length} máy?`)) return;
+  await Promise.all(targets.map(x => proxyRequest(`${cleanBaseUrl(x.a.url)}/swapper/stop`, 'POST', {}).catch(() => null)));
+  showToast('🛑 Đã gửi STOP ALL!');
+  await refreshAll(false);
+}
+
+function openConfigModal() {
+  const container = document.getElementById('cfgFields');
+  container.innerHTML = accounts.map((a, i) => `
+    <div class="cfg-block">
+      <h3>Máy ${i + 1}</h3>
+      <div class="cfg-field">
+        <label>Tên hiển thị</label>
+        <input type="text" id="cfg-name-${i}" value="${escapeHtml(a.name)}">
+      </div>
+      <div class="cfg-field">
+        <label>URL Dashboard Swapper (port 8899)</label>
+        <input type="url" id="cfg-url-${i}" placeholder="http://100.x.x.x:8899" value="${escapeHtml(a.url)}">
+      </div>
+      <div class="cfg-field" style="margin-bottom:0">
+        <label>Ví BSC (tùy chọn — bỏ trống tự lấy từ máy)</label>
+        <input type="text" id="cfg-wallet-${i}" placeholder="0x..." value="${escapeHtml(a.wallet)}">
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('configModal').classList.remove('hidden');
+}
+
+function closeConfigModal() {
+  document.getElementById('configModal').classList.add('hidden');
+}
+
+function saveConfigModal() {
+  for (let i = 0; i < 3; i++) {
+    accounts[i].name = document.getElementById(`cfg-name-${i}`).value.trim() || `Acc ${i + 1}`;
+    accounts[i].url = cleanBaseUrl(document.getElementById(`cfg-url-${i}`).value);
+    accounts[i].wallet = document.getElementById(`cfg-wallet-${i}`).value.trim();
+  }
+  localStorage.setItem(LS_ACCS, JSON.stringify(accounts));
+  closeConfigModal();
+  showToast('✅ Đã lưu cấu hình 3 máy');
+  refreshAll(true);
+}
+
+function onIntervalChange() {
+  const sec = parseInt(document.getElementById('pollIntervalSel').value || '15', 10);
+  localStorage.setItem(LS_INT, String(sec));
+  schedulePoll();
+}
+
+function schedulePoll() {
+  if (pollTimer) clearInterval(pollTimer);
+  const sec = parseInt(document.getElementById('pollIntervalSel').value || '15', 10);
+  if (sec > 0) {
+    pollTimer = setInterval(() => refreshAll(false), sec * 1000);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  const savedInt = localStorage.getItem(LS_INT);
+  if (savedInt !== null) {
+    document.getElementById('pollIntervalSel').value = savedInt;
+  }
+  renderCards();
+  await refreshAll(true);
+  schedulePoll();
+});
+</script>
+</body>
+</html>
