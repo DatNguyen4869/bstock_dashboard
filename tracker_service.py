@@ -35,6 +35,9 @@ GENERAL_RPC_URLS = [
 CAMPAIGN_START_UTC = datetime(2026, 11, 20, 2, 0, 0, tzinfo=timezone.utc)
 CAMPAIGN_END_UTC = datetime(2026, 12, 4, 2, 0, 0, tzinfo=timezone.utc)
 TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+WBNB_ADDRESS = "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"
+WBNB_DEPOSIT_TOPIC = "0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c"
+WBNB_WITHDRAWAL_TOPIC = "0x7fcf532c15f0a6db0bd6d0e038bea71d30d808c7d98cb3bf7268a95bf5081b65"
 
 BOOSTED_TOKENS = {"ANTB", "NVDAB"}
 STABLECOINS = {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "USR", "USDX"}
@@ -480,9 +483,34 @@ def fetch_wallet_data(wallet: str) -> dict:
         for log in combined_logs:
             logs_by_tx[log["transactionHash"]].append(log)
 
-        swap_candidate_hashes = [h for h, ls in logs_by_tx.items() if len(ls) >= 2]
+        all_contracts = [log["address"].lower() for log in combined_logs]
+        prefetch_tokens(all_contracts)
 
-        missing_txs = [h for h in swap_candidate_hashes if h not in CACHE["txs"]]
+        def _is_candidate_tx(ls):
+            if len(ls) >= 2:
+                return True
+            for l in ls:
+                sym = CACHE["tokens"].get(l["address"].lower(), {}).get("symbol", "")
+                if is_bstock(sym):
+                    return True
+            return False
+
+        swap_candidate_hashes = [h for h, ls in logs_by_tx.items() if _is_candidate_tx(ls)]
+
+        # Also backfill receipts for cached txs that predate native BNB/WBNB tracking
+        def _needs_bnb_backfill(h):
+            td = CACHE["txs"].get(h)
+            if not td:
+                return True
+            if "wbnbWithdrawalBnb" in td and "wbnbDepositBnb" in td:
+                return False
+            # Only backfill if this tx involves a bStock without a stablecoin transfer
+            ls = logs_by_tx[h]
+            has_bs = any(is_bstock(CACHE["tokens"].get(l["address"].lower(), {}).get("symbol", "")) for l in ls)
+            has_st = any(CACHE["tokens"].get(l["address"].lower(), {}).get("symbol", "").upper() in STABLECOINS for l in ls)
+            return has_bs and not has_st
+
+        missing_txs = [h for h in swap_candidate_hashes if _needs_bnb_backfill(h)]
         if missing_txs:
             receipts = rpc_batch_parallel([("eth_getTransactionReceipt", [h]) for h in missing_txs], batch_size=25, max_workers=6)
             fallback_hashes = []
@@ -518,6 +546,21 @@ def fetch_wallet_data(wallet: str) -> dict:
                     egp = fallback_tx_map[h].get("gasPrice", "0x0")
                 gas_price = int(egp or "0x0", 16)
                 bn = rc["blockNumber"]
+                wbnb_dep = 0.0
+                wbnb_wd = 0.0
+                for rl in rc.get("logs") or []:
+                    if (rl.get("address") or "").lower() != WBNB_ADDRESS:
+                        continue
+                    rtopics = rl.get("topics") or []
+                    if not rtopics:
+                        continue
+                    t0 = str(rtopics[0]).lower()
+                    raw_d = rl.get("data") or "0x0"
+                    val_bnb = (int(raw_d, 16) / 1e18) if raw_d != "0x" else 0.0
+                    if t0 == WBNB_DEPOSIT_TOPIC:
+                        wbnb_dep += val_bnb
+                    elif t0 == WBNB_WITHDRAWAL_TOPIC:
+                        wbnb_wd += val_bnb
                 CACHE["txs"][h] = {
                     "gasFeeBnb": (gas_price * gas_used) / 1e18,
                     "timestamp": CACHE["blocks"].get(bn, 0),
@@ -526,10 +569,10 @@ def fetch_wallet_data(wallet: str) -> dict:
                     "status": rc.get("status", "0x1"),
                     "from": (rc.get("from") or "").lower(),
                     "to": (rc.get("to") or "").lower(),
+                    "wbnbDepositBnb": wbnb_dep,
+                    "wbnbWithdrawalBnb": wbnb_wd,
                 }
 
-        contracts = [log["address"].lower() for h in swap_candidate_hashes for log in logs_by_tx[h]]
-        prefetch_tokens(contracts)
         save_cache(CACHE)
 
         orders = []
@@ -576,8 +619,21 @@ def fetch_wallet_data(wallet: str) -> dict:
 
             side_items = outgoing if is_buy else incoming
             stable_amt = sum(i["amount"] for i in side_items if i["symbol"].upper() in STABLECOINS)
-            wbnb_amt = sum(i["amount"] for i in side_items if i["symbol"].upper() in ("WBNB", "BNB"))
-            usd_amount = stable_amt if stable_amt > 0 else wbnb_amt * bnb_price
+            wbnb_amt = sum(
+                i["amount"] for i in side_items
+                if i["symbol"].upper() in ("WBNB", "BNB") or i["contract"] == WBNB_ADDRESS
+            )
+            if stable_amt > 0:
+                usd_amount = stable_amt
+            elif wbnb_amt > 0:
+                usd_amount = wbnb_amt * bnb_price
+            elif is_buy and float(td.get("wbnbDepositBnb") or 0.0) > 0:
+                usd_amount = float(td["wbnbDepositBnb"]) * bnb_price
+            elif (not is_buy) and float(td.get("wbnbWithdrawalBnb") or 0.0) > 0:
+                usd_amount = float(td["wbnbWithdrawalBnb"]) * bnb_price
+            else:
+                # Skip plain bStock wallet-to-wallet transfers with no payment leg
+                continue
 
             multiplier = 1.5 if bstock_symbol.upper() in BOOSTED_TOKENS else 1.0
             gas_fee_bnb = td["gasFeeBnb"]
